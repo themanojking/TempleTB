@@ -3,10 +3,13 @@ import axios from "axios";
 
 const AuthContext = createContext();
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem("token") || null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null); // ✅ track errors globally
 
   useEffect(() => {
     if (token) {
@@ -19,9 +22,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/auth/me`
-      );
+      const res = await axios.get(`${API_URL}/api/auth/me`);
       setUser(res.data.user);
     } catch {
       logout();
@@ -30,30 +31,53 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
-    const res = await axios.post(
-      `${import.meta.env.VITE_API_URL}/api/auth/login`,
-      { email, password }
-    );
-    const { token: newToken, user: userData } = res.data;
+  // ✅ Reusable token setter
+  const saveToken = (newToken) => {
     localStorage.setItem("token", newToken);
     axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
     setToken(newToken);
-    setUser(userData);
-    return res.data;
+  };
+
+  const login = async (email, password) => {
+    try {
+      setError(null);
+      const res = await axios.post(`${API_URL}/api/auth/login`, {
+        email,
+        password,
+      });
+      const { token: newToken, user: userData } = res.data;
+      saveToken(newToken);
+      setUser(userData);
+      return res.data;
+    } catch (err) {
+      // ✅ Extract real server error message
+      const message =
+        err.response?.data?.message || "Login failed. Please try again.";
+      setError(message);
+      throw new Error(message); // so Auth.jsx can catch it too
+    }
   };
 
   const register = async (name, email, password, phone) => {
-    const res = await axios.post(
-      `${import.meta.env.VITE_API_URL}/api/auth/register`,
-      { name, email, password, phone }
-    );
-    const { token: newToken, user: userData } = res.data;
-    localStorage.setItem("token", newToken);
-    axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
-    setToken(newToken);
-    setUser(userData);
-    return res.data;
+    try {
+      setError(null);
+      const res = await axios.post(`${API_URL}/api/auth/register`, {
+        name,
+        email,
+        password,
+        phone,
+      });
+      const { token: newToken, user: userData } = res.data;
+      saveToken(newToken);
+      setUser(userData);
+      return res.data;
+    } catch (err) {
+      // ✅ Extract real server error message
+      const message =
+        err.response?.data?.message || "Registration failed. Please try again.";
+      setError(message);
+      throw new Error(message); // so Auth.jsx can catch it too
+    }
   };
 
   const logout = () => {
@@ -61,10 +85,16 @@ export const AuthProvider = ({ children }) => {
     delete axios.defaults.headers.common["Authorization"];
     setToken(null);
     setUser(null);
+    setError(null);
   };
 
+  // ✅ Clear error manually (useful for dismissing error UI)
+  const clearError = () => setError(null);
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, token, loading, error, login, register, logout, clearError }}
+    >
       {children}
     </AuthContext.Provider>
   );

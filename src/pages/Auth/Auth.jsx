@@ -14,7 +14,13 @@ const Auth = () => {
   const [searchParams] = useSearchParams();
   const mode = searchParams.get("mode") || "login";
 
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "", phone: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+    phone: "",
+  });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
@@ -25,59 +31,95 @@ const Auth = () => {
     if (user) navigate("/");
   }, [user]);
 
+  // ✅ Matches backend regex exactly
+  const PHONE_REGEX = /^\+?91?[-.\s]?[6-9]\d{9}$/;
+
   const validate = () => {
     const e = {};
-    if (mode === "register" && !form.name.trim()) e.name = "Name is required";
-    if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email = "Valid email required";
-    if (form.password.length < 6) e.password = "Password must be at least 6 characters";
-    if (mode === "register") {
-      if (form.password !== form.confirmPassword) e.confirmPassword = "Passwords do not match";
-      if (!form.phone.match(/^\+?[6-9]\d{9}$/)) e.phone = "Valid 10-digit phone required";
+
+    if (mode === "register" && !form.name.trim()) {
+      e.name = "Name is required";
     }
+
+    if (mode === "register" && form.name.trim().length < 2) {
+      e.name = "Name must be at least 2 characters";
+    }
+
+    if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      e.email = "Valid email required";
+    }
+
+    if (form.password.length < 6) {
+      e.password = "Password must be at least 6 characters";
+    }
+
+    if (mode === "register") {
+      if (form.password !== form.confirmPassword) {
+        e.confirmPassword = "Passwords do not match";
+      }
+      // ✅ Fixed: matches backend regex
+      if (!PHONE_REGEX.test(form.phone)) {
+        e.phone = "Enter valid phone (e.g. 9876543210 or +91 9876543210)";
+      }
+    }
+
     return e;
   };
 
+  // ✅ Normalize phone before sending to backend
+  const normalizePhone = (phone) => {
+    return phone.replace(/[\s\-\.]/g, ""); // remove spaces, dashes, dots
+  };
+
   const handleSubmit = async () => {
-  const e = validate();
-  if (Object.keys(e).length > 0) {
-    setErrors(e);
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    if (mode === "login") {
-      const res = await login(form.email, form.password);
-      toast.success(res?.message || "Welcome back! 🙏");
-    } else {
-      const res = await register(form.name, form.email, form.password, form.phone);
-      toast.success(res?.message || "Account created! 🙏");
+    const e = validate();
+    if (Object.keys(e).length > 0) {
+      setErrors(e);
+      return;
     }
 
-    navigate("/");
-  } catch (err) {
-    console.error("Auth Error:", err);
+    setLoading(true);
 
-    // 🔥 Improved error handling
-    if (err.response) {
-      // Backend responded with error
-      toast.error(err.response.data?.message || "Server error");
-    } else if (err.request) {
-      // Request made but no response
-      toast.error("Server not responding. Check backend.");
-    } else {
-      // Something else
-      toast.error("Something went wrong");
+    try {
+      if (mode === "login") {
+        const res = await login(form.email, form.password);
+        toast.success(res?.message || "Welcome back! 🙏");
+      } else {
+        const res = await register(
+          form.name,
+          form.email,
+          form.password,
+          normalizePhone(form.phone) // ✅ clean phone before sending
+        );
+        toast.success(res?.message || "Account created! 🙏");
+      }
+      navigate("/");
+    } catch (err) {
+      // ✅ AuthContext throws new Error(message) — use err.message directly
+      toast.error(err.message || "Something went wrong");
+    } finally {
+      setLoading(false);
     }
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
+  const handleChange = (field) => (e) => {
+    setForm({ ...form, [field]: e.target.value });
+    // ✅ Clear error on typing
+    if (errors[field]) setErrors({ ...errors, [field]: "" });
+  };
+
+  const switchMode = (newMode) => {
+    navigate(`/auth?mode=${newMode}`);
+    setErrors({});
+    setForm({ name: "", email: "", password: "", confirmPassword: "", phone: "" });
+  };
+
   const inputWrap = "relative";
   const iconClass = "absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 text-sm";
   const inputClass = (field) =>
-    `w-full bg-stone-800/80 border ${errors[field] ? "border-red-600/70" : "border-amber-900/30"} text-stone-100 font-lato text-sm rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition-all placeholder-stone-500`;
+    `w-full bg-stone-800/80 border ${
+      errors[field] ? "border-red-600/70" : "border-amber-900/30"
+    } text-stone-100 font-lato text-sm rounded-xl pl-10 pr-4 py-3 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 transition-all placeholder-stone-500`;
 
   return (
     <div className="min-h-screen bg-stone-950 flex items-center justify-center px-4 py-20 relative overflow-hidden">
@@ -107,7 +149,7 @@ const Auth = () => {
             {["login", "register"].map((m) => (
               <button
                 key={m}
-                onClick={() => { navigate(`/auth?mode=${m}`); setErrors({}); setForm({ name: "", email: "", password: "", confirmPassword: "", phone: "" }); }}
+                onClick={() => switchMode(m)}
                 className={`flex-1 font-cinzel text-sm py-2.5 rounded-lg transition-all duration-200 ${
                   mode === m
                     ? "bg-amber-600 text-stone-950 font-bold shadow-lg shadow-amber-600/20"
@@ -120,7 +162,7 @@ const Auth = () => {
           </div>
 
           <div className="space-y-4">
-            {/* Name (register only) */}
+            {/* Name */}
             {mode === "register" && (
               <div className={inputWrap}>
                 <FaUser className={iconClass} />
@@ -128,9 +170,11 @@ const Auth = () => {
                   className={inputClass("name")}
                   placeholder={t("auth.name")}
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={handleChange("name")}
                 />
-                {errors.name && <p className="text-red-400 text-xs mt-1 font-lato">{errors.name}</p>}
+                {errors.name && (
+                  <p className="text-red-400 text-xs mt-1 font-lato">{errors.name}</p>
+                )}
               </div>
             )}
 
@@ -142,23 +186,27 @@ const Auth = () => {
                 className={inputClass("email")}
                 placeholder={t("auth.email")}
                 value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                onChange={handleChange("email")}
               />
-              {errors.email && <p className="text-red-400 text-xs mt-1 font-lato">{errors.email}</p>}
+              {errors.email && (
+                <p className="text-red-400 text-xs mt-1 font-lato">{errors.email}</p>
+              )}
             </div>
 
-            {/* Phone (register only) */}
+            {/* Phone */}
             {mode === "register" && (
               <div className={inputWrap}>
                 <FaPhone className={iconClass} />
                 <input
                   type="tel"
                   className={inputClass("phone")}
-                  placeholder={t("auth.phone")}
+                  placeholder="9876543210 or +91 9876543210"
                   value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  onChange={handleChange("phone")}
                 />
-                {errors.phone && <p className="text-red-400 text-xs mt-1 font-lato">{errors.phone}</p>}
+                {errors.phone && (
+                  <p className="text-red-400 text-xs mt-1 font-lato">{errors.phone}</p>
+                )}
               </div>
             )}
 
@@ -170,7 +218,7 @@ const Auth = () => {
                 className={`${inputClass("password")} pr-10`}
                 placeholder={t("auth.password")}
                 value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                onChange={handleChange("password")}
               />
               <button
                 type="button"
@@ -179,10 +227,12 @@ const Auth = () => {
               >
                 {showPass ? <FaEyeSlash /> : <FaEye />}
               </button>
-              {errors.password && <p className="text-red-400 text-xs mt-1 font-lato">{errors.password}</p>}
+              {errors.password && (
+                <p className="text-red-400 text-xs mt-1 font-lato">{errors.password}</p>
+              )}
             </div>
 
-            {/* Confirm Password (register only) */}
+            {/* Confirm Password */}
             {mode === "register" && (
               <div className={inputWrap}>
                 <FaLock className={iconClass} />
@@ -191,7 +241,7 @@ const Auth = () => {
                   className={`${inputClass("confirmPassword")} pr-10`}
                   placeholder={t("auth.confirm_password")}
                   value={form.confirmPassword}
-                  onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
+                  onChange={handleChange("confirmPassword")}
                 />
                 <button
                   type="button"
@@ -232,7 +282,7 @@ const Auth = () => {
           <p className="text-center font-lato text-stone-400 text-sm">
             {mode === "login" ? t("auth.no_account") : t("auth.have_account")}{" "}
             <button
-              onClick={() => { navigate(`/auth?mode=${mode === "login" ? "register" : "login"}`); setErrors({}); }}
+              onClick={() => switchMode(mode === "login" ? "register" : "login")}
               className="text-amber-500 hover:text-amber-400 font-semibold transition-colors"
             >
               {mode === "login" ? t("auth.register_link") : t("auth.login_link")}
@@ -240,7 +290,6 @@ const Auth = () => {
           </p>
         </div>
 
-        {/* Decorative bottom text */}
         <p className="text-center font-lato text-stone-600 text-xs mt-6">
           🙏 Hara Hara Mahadeva · Om Nama Shivaya
         </p>
