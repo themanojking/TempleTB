@@ -38,25 +38,42 @@ const Auth = () => {
   };
 
   const handleSubmit = async () => {
-    const e = validate();
-    if (Object.keys(e).length > 0) { setErrors(e); return; }
-    setLoading(true);
-    try {
-      if (mode === "login") {
-        await login(form.email, form.password);
-        toast.success("Welcome back! 🙏");
-      } else {
-        await register(form.name, form.email, form.password, form.phone);
-        toast.success("Account created! 🙏");
-      }
-      navigate("/");
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Something went wrong");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const e = validate();
+  if (Object.keys(e).length > 0) {
+    setErrors(e);
+    return;
+  }
 
+  setLoading(true);
+
+  try {
+    if (mode === "login") {
+      const res = await login(form.email, form.password);
+      toast.success(res?.message || "Welcome back! 🙏");
+    } else {
+      const res = await register(form.name, form.email, form.password, form.phone);
+      toast.success(res?.message || "Account created! 🙏");
+    }
+
+    navigate("/");
+  } catch (err) {
+    console.error("Auth Error:", err);
+
+    // 🔥 Improved error handling
+    if (err.response) {
+      // Backend responded with error
+      toast.error(err.response.data?.message || "Server error");
+    } else if (err.request) {
+      // Request made but no response
+      toast.error("Server not responding. Check backend.");
+    } else {
+      // Something else
+      toast.error("Something went wrong");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
   const inputWrap = "relative";
   const iconClass = "absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-500 text-sm";
   const inputClass = (field) =>
