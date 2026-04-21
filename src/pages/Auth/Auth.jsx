@@ -31,18 +31,25 @@ const Auth = () => {
     if (user) navigate("/");
   }, [user]);
 
-  // ✅ Matches backend regex exactly
-  const PHONE_REGEX = /^\+?91?[-.\s]?[6-9]\d{9}$/;
+  // ✅ Normalize phone - strips all formatting, removes +91 prefix
+  const normalizePhone = (phone) => {
+    let cleaned = phone.replace(/[\s\-\.\(\)]/g, "");
+    if (cleaned.startsWith("+91")) cleaned = cleaned.slice(3);
+    if (cleaned.startsWith("91") && cleaned.length === 12) cleaned = cleaned.slice(2);
+    return cleaned; // always returns clean 10-digit number
+  };
 
   const validate = () => {
     const e = {};
 
-    if (mode === "register" && !form.name.trim()) {
-      e.name = "Name is required";
-    }
-
-    if (mode === "register" && form.name.trim().length < 2) {
-      e.name = "Name must be at least 2 characters";
+    if (mode === "register") {
+      if (!form.name.trim()) {
+        e.name = "Name is required";
+      } else if (form.name.trim().length < 2) {
+        e.name = "Name must be at least 2 characters";
+      } else if (form.name.trim().length > 50) {
+        e.name = "Name cannot exceed 50 characters";
+      }
     }
 
     if (!form.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
@@ -57,18 +64,15 @@ const Auth = () => {
       if (form.password !== form.confirmPassword) {
         e.confirmPassword = "Passwords do not match";
       }
-      // ✅ Fixed: matches backend regex
-      if (!PHONE_REGEX.test(form.phone)) {
-        e.phone = "Enter valid phone (e.g. 9876543210 or +91 9876543210)";
+
+      // ✅ Validate after normalizing so any format works
+      const cleaned = normalizePhone(form.phone);
+      if (!/^[6-9]\d{9}$/.test(cleaned)) {
+        e.phone = "Enter valid 10-digit Indian mobile number";
       }
     }
 
     return e;
-  };
-
-  // ✅ Normalize phone before sending to backend
-  const normalizePhone = (phone) => {
-    return phone.replace(/[\s\-\.]/g, ""); // remove spaces, dashes, dots
   };
 
   const handleSubmit = async () => {
@@ -89,22 +93,21 @@ const Auth = () => {
           form.name,
           form.email,
           form.password,
-          normalizePhone(form.phone) // ✅ clean phone before sending
+          normalizePhone(form.phone) // ✅ always sends clean 10-digit number
         );
         toast.success(res?.message || "Account created! 🙏");
       }
       navigate("/");
     } catch (err) {
-      // ✅ AuthContext throws new Error(message) — use err.message directly
       toast.error(err.message || "Something went wrong");
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ Clears field error as user types
   const handleChange = (field) => (e) => {
     setForm({ ...form, [field]: e.target.value });
-    // ✅ Clear error on typing
     if (errors[field]) setErrors({ ...errors, [field]: "" });
   };
 
@@ -144,6 +147,7 @@ const Auth = () => {
 
         {/* Card */}
         <div className="bg-stone-900/80 backdrop-blur border border-amber-900/25 rounded-2xl p-8 shadow-2xl shadow-stone-950/50">
+          
           {/* Tab Toggle */}
           <div className="flex bg-stone-800 rounded-xl p-1 mb-7">
             {["login", "register"].map((m) => (
@@ -251,7 +255,9 @@ const Auth = () => {
                   {showConfirm ? <FaEyeSlash /> : <FaEye />}
                 </button>
                 {errors.confirmPassword && (
-                  <p className="text-red-400 text-xs mt-1 font-lato">{errors.confirmPassword}</p>
+                  <p className="text-red-400 text-xs mt-1 font-lato">
+                    {errors.confirmPassword}
+                  </p>
                 )}
               </div>
             )}
