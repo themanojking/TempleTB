@@ -22,7 +22,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/auth/me`);
+      const res = await axios.get(`${API_URL}/auth/me`);
       setUser(res.data.user);
     } catch {
       logout();
@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     try {
       setError(null);
-      const res = await axios.post(`${API_URL}/api/auth/login`, {
+      const res = await axios.post(`${API_URL}/auth/login`, {
         email,
         password,
       });
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (name, email, password, phone) => {
     try {
       setError(null);
-      const res = await axios.post(`${API_URL}/api/auth/register`, {
+      const res = await axios.post(`${API_URL}/auth/register`, {
         name,
         email,
         password,
