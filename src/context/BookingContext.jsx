@@ -12,7 +12,7 @@ export const BookingProvider = ({ children }) => {
     setLoadingBookings(true);
     try {
       const res = await axios.get(
-        `${import.meta.env.VITE_API_URL}/api/bookings/my`
+        `${import.meta.env.VITE_API_URL}/bookings/my`
       );
       setBookings(res.data.bookings);
     } catch (err) {
@@ -24,7 +24,7 @@ export const BookingProvider = ({ children }) => {
 
   const createBooking = async (bookingData) => {
     const res = await axios.post(
-      `${import.meta.env.VITE_API_URL}/api/bookings`,
+      `${import.meta.env.VITE_API_URL}/bookings`,
       bookingData
     );
     setBookings((prev) => [res.data.booking, ...prev]);
@@ -33,7 +33,7 @@ export const BookingProvider = ({ children }) => {
 
   const cancelBooking = async (bookingId) => {
     await axios.patch(
-      `${import.meta.env.VITE_API_URL}/api/bookings/${bookingId}/cancel`
+      `${import.meta.env.VITE_API_URL}/bookings/${bookingId}/cancel`
     );
     setBookings((prev) =>
       prev.map((b) =>
